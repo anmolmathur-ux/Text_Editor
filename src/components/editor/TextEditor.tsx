@@ -12,12 +12,14 @@ import Placeholder from '@tiptap/extension-placeholder';
 import FontFamily from '@tiptap/extension-font-family';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
+import EditorHeader from './EditorHeader';
 import EditorToolbar from './EditorToolbar';
 import EditorRuler from './EditorRuler';
 import FindReplaceDialog from './FindReplaceDialog';
 import PageSetupDialog from './PageSetupDialog';
 import AISidebar from './AISidebar';
 import { PAGE_SIZES, PageSize } from './types';
+import { toast } from 'sonner';
 
 const TextEditor: React.FC = () => {
   const [zoom, setZoom] = useState(100);
@@ -25,6 +27,7 @@ const TextEditor: React.FC = () => {
   const [showPageSetup, setShowPageSetup] = useState(false);
   const [showAISidebar, setShowAISidebar] = useState(false);
   const [selectedText, setSelectedText] = useState('');
+  const [documentTitle, setDocumentTitle] = useState('Untitled Document');
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZES.letter);
   const [margins, setMargins] = useState({ top: 1, bottom: 1, left: 1, right: 1 });
   const [tabStops, setTabStops] = useState<number[]>([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
@@ -118,6 +121,23 @@ const TextEditor: React.FC = () => {
     setTabStops(prev => prev.filter(t => Math.abs(t - position) > 0.05));
   }, []);
 
+  const handleSave = useCallback(() => {
+    toast.success('Document saved successfully!');
+  }, []);
+
+  const handleExport = useCallback(() => {
+    if (!editor) return;
+    const html = editor.getHTML();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${documentTitle}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Document exported!');
+  }, [editor, documentTitle]);
+
   // Calculate page dimensions in pixels (at 96 DPI)
   const pageWidthPx = pageSize.width * 96;
   const pageHeightPx = pageSize.height * 96;
@@ -129,6 +149,16 @@ const TextEditor: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
+      {/* Header Bar */}
+      <EditorHeader
+        editor={editor}
+        documentTitle={documentTitle}
+        onTitleChange={setDocumentTitle}
+        onSave={handleSave}
+        onExport={handleExport}
+        onToggleAI={() => setShowAISidebar(!showAISidebar)}
+      />
+
       {/* Toolbar */}
       <EditorToolbar
         editor={editor}
