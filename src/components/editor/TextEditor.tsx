@@ -1,4 +1,5 @@
-import { useEditor, EditorContent, Editor } from '@tiptap/react';
+import React, { useState, useCallback } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
@@ -15,38 +16,19 @@ import Color from '@tiptap/extension-color';
 import FontFamily from '@tiptap/extension-font-family';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import {
-  PanelLeft,
-  Sparkles,
-  Save,
-  Clock,
-  FileText,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { EditorToolbar } from './EditorToolbar';
-import { AISidebar } from './AISidebar';
-import { DocumentOutline } from './DocumentOutline';
-import { ExportMenu } from './ExportMenu';
-import { toast } from 'sonner';
+import EditorToolbar from './EditorToolbar';
+import EditorRuler from './EditorRuler';
+import FindReplaceDialog from './FindReplaceDialog';
+import PageSetupDialog from './PageSetupDialog';
+import { PAGE_SIZES, PageSize } from './types';
 
-interface Heading {
-  level: number;
-  text: string;
-  id: string;
-}
-
-export const TextEditor = () => {
-  const [documentTitle, setDocumentTitle] = useState('Untitled Document');
-  const [isAISidebarOpen, setIsAISidebarOpen] = useState(false);
-  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
-  const [headings, setHeadings] = useState<Heading[]>([]);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [wordCount, setWordCount] = useState(0);
+const TextEditor: React.FC = () => {
   const [zoom, setZoom] = useState(100);
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [showPageSetup, setShowPageSetup] = useState(false);
+  const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZES.letter);
+  const [margins, setMargins] = useState({ top: 1, bottom: 1, left: 1, right: 1 });
+  const [tabStops, setTabStops] = useState<number[]>([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
 
   const editor = useEditor({
     extensions: [
@@ -78,8 +60,17 @@ export const TextEditor = () => {
       TextStyle,
       Color,
       FontFamily,
+      FontSize,
+      LineHeight,
+      Indent,
       Subscript,
       Superscript,
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
     ],
     content: `<h1>Welcome to TEXT Editor</h1><p>This is a professional-grade document editor with AI-powered features. Start writing your next masterpiece!</p><h2>Getting Started</h2><p>Use the toolbar above to format your text, add headings, lists, and more. Click the <strong>AI</strong> button to access AI-powered writing assistance.</p><h3>Features</h3><ul><li>Rich text formatting (bold, italic, underline, etc.)</li><li>Multiple heading levels</li><li>Lists and blockquotes</li><li>Code blocks with syntax highlighting</li><li>Tables and images</li><li>AI-powered content generation</li></ul><blockquote>"The first draft is just you telling yourself the story." — Terry Pratchett</blockquote><h2>Export Options</h2><p>When you're ready, export your document as PDF, DOCX, or Markdown.</p>`,
     onUpdate: ({ editor }) => {
@@ -96,6 +87,22 @@ export const TextEditor = () => {
       }
     },
   });
+
+  // Track selected text for AI sidebar
+  useEffect(() => {
+    if (!editor) return;
+    
+    const updateSelection = () => {
+      const { from, to } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, ' ');
+      setSelectedText(text);
+    };
+
+    editor.on('selectionUpdate', updateSelection);
+    return () => {
+      editor.off('selectionUpdate', updateSelection);
+    };
+  }, [editor]);
 
   const updateHeadings = useCallback((editor: Editor) => {
     const newHeadings: Heading[] = [];
@@ -117,12 +124,9 @@ export const TextEditor = () => {
     setWordCount(words);
   }, []);
 
-  useEffect(() => {
-    if (editor) {
-      updateHeadings(editor);
-      updateWordCount(editor);
-    }
-  }, [editor, updateHeadings, updateWordCount]);
+  const handleOpenPageSetup = useCallback(() => {
+    setShowPageSetup(true);
+  }, []);
 
   const handleSave = () => {
     if (!editor) return;
@@ -144,121 +148,61 @@ export const TextEditor = () => {
     setIsAISidebarOpen(false);
   };
 
-  const handleTransformText = (action: string, result: string) => {
-    if (!editor) return;
-    
-    const { from, to } = editor.state.selection;
-    if (from !== to) {
-      editor.chain().focus().deleteRange({ from, to }).insertContent(result).run();
-      toast.success(`Text ${action}ed successfully!`);
-    }
-  };
+  const handleTabStopRemove = useCallback((position: number) => {
+    setTabStops(prev => prev.filter(t => Math.abs(t - position) > 0.05));
+  }, []);
 
-  const handleHeadingClick = (id: string) => {
-    const pos = parseInt(id.replace('heading-', ''));
-    if (editor) {
-      editor.chain().focus().setTextSelection(pos).run();
-    }
-  };
-
-  const getHTML = () => editor?.getHTML() || '';
-
-  const handleZoomChange = (newZoom: number) => {
-    setZoom(newZoom);
-  };
+  // Calculate page dimensions in pixels (at 96 DPI)
+  const pageWidthPx = pageSize.width * 96;
+  const pageHeightPx = pageSize.height * 96;
+  const contentWidthPx = (pageSize.width - margins.left - margins.right) * 96;
+  const paddingTopPx = margins.top * 96;
+  const paddingBottomPx = margins.bottom * 96;
+  const paddingLeftPx = margins.left * 96;
+  const paddingRightPx = margins.right * 96;
 
   return (
-    <div className="min-h-screen bg-editor-bg flex flex-col">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 z-40"
-      >
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOutlineOpen(!isOutlineOpen)}
-            className={isOutlineOpen ? 'bg-secondary' : ''}
-          >
-            <PanelLeft className="w-5 h-5" />
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            <Input
-              value={documentTitle}
-              onChange={(e) => setDocumentTitle(e.target.value)}
-              className="border-0 bg-transparent font-semibold text-lg focus-visible:ring-0 focus-visible:ring-offset-0 w-[200px] md:w-[300px]"
-              placeholder="Document title..."
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {lastSaved && (
-            <span className="text-xs text-muted-foreground hidden md:flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              Saved {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
-          
-          <span className="text-xs text-muted-foreground hidden sm:block">
-            {wordCount} words
-          </span>
-
-          <Button variant="outline" size="sm" onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Save
-          </Button>
-
-          <ExportMenu getHTML={getHTML} documentTitle={documentTitle} />
-
-          <Button
-            size="sm"
-            onClick={() => setIsAISidebarOpen(!isAISidebarOpen)}
-            className={isAISidebarOpen ? 'ai-gradient text-white' : ''}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            AI
-          </Button>
-        </div>
-      </motion.header>
-
+    <div className="flex flex-col h-screen bg-background">
       {/* Toolbar */}
-      <EditorToolbar editor={editor} zoom={zoom} onZoomChange={handleZoomChange} />
+      <EditorToolbar
+        editor={editor}
+        zoom={zoom}
+        onZoomChange={handleZoomChange}
+        onOpenFindReplace={handleOpenFindReplace}
+        onOpenPageSetup={handleOpenPageSetup}
+      />
 
-      {/* Main Content */}
-      <div className="flex-1 flex relative">
-        {/* Document Outline */}
-        <DocumentOutline
-          isOpen={isOutlineOpen}
-          onClose={() => setIsOutlineOpen(false)}
-          headings={headings}
-          onHeadingClick={handleHeadingClick}
-          documentTitle={documentTitle}
-        />
+      {/* Ruler */}
+      <EditorRuler
+        pageWidth={pageSize.width}
+        leftMargin={margins.left}
+        rightMargin={margins.right}
+        tabStops={tabStops}
+        zoom={zoom}
+        onTabStopAdd={handleTabStopAdd}
+        onTabStopRemove={handleTabStopRemove}
+        onMarginChange={(left, right) => setMargins(prev => ({ ...prev, left, right }))}
+      />
 
-        {/* Editor Area */}
-        <main
-          className={`flex-1 transition-all duration-300 ${
-            isOutlineOpen ? 'ml-64' : ''
-          } ${isAISidebarOpen ? 'mr-80' : ''}`}
+      {/* Editor Area */}
+      <div className="flex-1 overflow-auto bg-muted/30 p-8">
+        <div
+          className="mx-auto bg-card shadow-lg"
+          style={{
+            width: `${pageWidthPx * (zoom / 100)}px`,
+            minHeight: `${pageHeightPx * (zoom / 100)}px`,
+            transform: `scale(1)`,
+            transformOrigin: 'top center',
+          }}
         >
-          <div className="max-w-4xl mx-auto py-8 px-4 md:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-editor-paper rounded-lg paper-shadow min-h-[800px] p-8 md:p-12"
-              style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-            >
-              <EditorContent
-                editor={editor}
-                className="editor-document prose prose-lg max-w-none focus:outline-none"
-              />
-            </motion.div>
+          <div
+            style={{
+              padding: `${paddingTopPx * (zoom / 100)}px ${paddingRightPx * (zoom / 100)}px ${paddingBottomPx * (zoom / 100)}px ${paddingLeftPx * (zoom / 100)}px`,
+              minHeight: `${pageHeightPx * (zoom / 100)}px`,
+              fontSize: `${(zoom / 100)}em`,
+            }}
+          >
+            <EditorContent editor={editor} className="min-h-full" />
           </div>
         </main>
 
@@ -271,6 +215,23 @@ export const TextEditor = () => {
           onTransformText={handleTransformText}
         />
       </div>
+
+      {/* Find and Replace Dialog */}
+      <FindReplaceDialog
+        editor={editor}
+        open={showFindReplace}
+        onOpenChange={setShowFindReplace}
+      />
+
+      {/* Page Setup Dialog */}
+      <PageSetupDialog
+        open={showPageSetup}
+        onOpenChange={setShowPageSetup}
+        pageSize={pageSize}
+        margins={margins}
+        onPageSizeChange={handlePageSizeChange}
+        onMarginsChange={handleMarginsChange}
+      />
     </div>
   );
 };

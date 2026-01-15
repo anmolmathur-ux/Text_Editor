@@ -241,8 +241,14 @@ export const EditorToolbar = ({ editor, zoom, onZoomChange }: EditorToolbarProps
             File
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>New</DropdownMenuItem>
-            <DropdownMenuItem>Open</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleNew}>
+              <FilePlus className="h-4 w-4 mr-2" />
+              New
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpen}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Open
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Save</DropdownMenuItem>
             <DropdownMenuItem>Save as...</DropdownMenuItem>
@@ -256,10 +262,10 @@ export const EditorToolbar = ({ editor, zoom, onZoomChange }: EditorToolbarProps
             Edit
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => editor.chain().focus().undo().run()}>
+            <DropdownMenuItem onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
               Undo
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => editor.chain().focus().redo().run()}>
+            <DropdownMenuItem onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
               Redo
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -315,15 +321,19 @@ export const EditorToolbar = ({ editor, zoom, onZoomChange }: EditorToolbarProps
               <DropdownMenuSubTrigger>Text</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleBold().run()}>
+                  <Bold className="h-4 w-4 mr-2" />
                   Bold
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleItalic().run()}>
+                  <Italic className="h-4 w-4 mr-2" />
                   Italic
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleUnderline().run()}>
+                  <UnderlineIcon className="h-4 w-4 mr-2" />
                   Underline
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleStrike().run()}>
+                  <Strikethrough className="h-4 w-4 mr-2" />
                   Strikethrough
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -349,17 +359,34 @@ export const EditorToolbar = ({ editor, zoom, onZoomChange }: EditorToolbarProps
               <DropdownMenuSubTrigger>Align & indent</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+                  <AlignLeft className="h-4 w-4 mr-2" />
                   Left
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+                  <AlignCenter className="h-4 w-4 mr-2" />
                   Center
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('right').run()}>
+                  <AlignRight className="h-4 w-4 mr-2" />
                   Right
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
+                  <AlignJustify className="h-4 w-4 mr-2" />
                   Justify
                 </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <LineChart className="h-4 w-4 mr-2" />
+                Line spacing
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {LINE_HEIGHTS.map((lh) => (
+                  <DropdownMenuItem key={lh.value} onClick={() => editor.chain().focus().setLineHeight(lh.value).run()}>
+                    {lh.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
