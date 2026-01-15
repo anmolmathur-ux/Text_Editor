@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,9 +26,17 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
   Bold,
   Italic,
-  Underline,
+  Underline as UnderlineIcon,
   Strikethrough,
   AlignLeft,
   AlignCenter,
@@ -44,20 +52,29 @@ import {
   Minus,
   Plus,
   Printer,
-  ChevronDown,
-  MoreHorizontal,
   Highlighter,
   Type,
   IndentDecrease,
   IndentIncrease,
   RemoveFormatting,
-  LineChart,
   FileText,
-  Settings,
   Sparkles,
+  Subscript,
+  Superscript,
+  Table,
+  FileDown,
+  FilePlus,
+  FolderOpen,
+  Save,
+  Settings,
+  Keyboard,
+  Info,
+  LineChart,
+  SpellCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -87,6 +104,15 @@ const COLORS = [
   '#e6b8af', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#c9daf8', '#cfe2f3', '#d9d2e9', '#ead1dc',
 ];
 
+const LINE_HEIGHTS = [
+  { value: '1', label: 'Single' },
+  { value: '1.15', label: '1.15' },
+  { value: '1.5', label: '1.5' },
+  { value: '2', label: 'Double' },
+  { value: '2.5', label: '2.5' },
+  { value: '3', label: 'Triple' },
+];
+
 const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editor,
   zoom,
@@ -95,13 +121,140 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onOpenPageSetup,
   onOpenAISidebar,
 }) => {
+  const [fontSize, setFontSize] = useState('11');
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [showWordCount, setShowWordCount] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   if (!editor) return null;
 
   const currentFont = editor.getAttributes('textStyle').fontFamily || 'Arial';
   const currentColor = editor.getAttributes('textStyle').color || '#000000';
+  const currentFontSize = editor.getAttributes('textStyle').fontSize?.replace('pt', '') || '11';
+
+  // Font size handlers
+  const handleFontSizeChange = (newSize: string) => {
+    const size = parseInt(newSize);
+    if (size >= 1 && size <= 400) {
+      setFontSize(newSize);
+      editor.chain().focus().setFontSize(`${size}pt`).run();
+    }
+  };
+
+  const increaseFontSize = () => {
+    const currentSize = parseInt(fontSize);
+    const nextSize = FONT_SIZES.find(s => s > currentSize) || currentSize + 2;
+    handleFontSizeChange(String(nextSize));
+  };
+
+  const decreaseFontSize = () => {
+    const currentSize = parseInt(fontSize);
+    const prevSize = [...FONT_SIZES].reverse().find(s => s < currentSize) || Math.max(1, currentSize - 2);
+    handleFontSizeChange(String(prevSize));
+  };
+
+  // Word count calculation
+  const getWordCount = () => {
+    const text = editor.state.doc.textContent;
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    const characters = text.length;
+    const charactersNoSpaces = text.replace(/\s/g, '').length;
+    return { words: words.length, characters, charactersNoSpaces };
+  };
+
+  // File operations
+  const handleNew = () => {
+    if (confirm('Create a new document? Any unsaved changes will be lost.')) {
+      editor.commands.setContent('<p></p>');
+      toast.success('New document created');
+    }
+  };
+
+  const handleOpen = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+          editor.commands.setContent(content);
+        } else {
+          editor.commands.setContent(`<p>${content}</p>`);
+        }
+        toast.success('File opened successfully');
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Link handling
+  const handleSetLink = () => {
+    if (linkUrl) {
+      editor.chain().focus().setLink({ href: linkUrl }).run();
+      setLinkUrl('');
+      setShowLinkDialog(false);
+    }
+  };
+
+  // Image handling
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        editor.chain().focus().setImage({ src: dataUrl }).run();
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSetImage = () => {
+    if (imageUrl) {
+      editor.chain().focus().setImage({ src: imageUrl }).run();
+      setImageUrl('');
+      setShowImageDialog(false);
+    }
+  };
+
+  // Table insertion
+  const handleInsertTable = () => {
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  };
+
+  // Horizontal rule
+  const handleInsertHorizontalRule = () => {
+    editor.chain().focus().setHorizontalRule().run();
+  };
 
   return (
     <div className="bg-card border-b border-border">
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".html,.htm,.txt"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageUpload}
+      />
+
       {/* Menu Bar */}
       <div className="flex items-center gap-1 px-2 py-1 border-b border-border text-sm">
         <DropdownMenu>
@@ -111,17 +264,55 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>New</DropdownMenuItem>
-            <DropdownMenuItem>Open</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleNew}>
+              <FilePlus className="h-4 w-4 mr-2" />
+              New
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpen}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Open
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Save</DropdownMenuItem>
-            <DropdownMenuItem>Download</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.success('Document saved!')}>
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <FileDown className="h-4 w-4 mr-2" />
+                Download
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => {
+                  const blob = new Blob([editor.getHTML()], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'document.html';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}>
+                  HTML (.html)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const blob = new Blob([editor.getText()], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'document.txt';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}>
+                  Plain text (.txt)
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onOpenPageSetup}>
               <Settings className="h-4 w-4 mr-2" />
               Page setup
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.print()}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </DropdownMenuItem>
@@ -135,16 +326,26 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => editor.chain().focus().undo().run()}>
+            <DropdownMenuItem onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}>
               Undo
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => editor.chain().focus().redo().run()}>
+            <DropdownMenuItem onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}>
               Redo
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Cut</DropdownMenuItem>
-            <DropdownMenuItem>Copy</DropdownMenuItem>
-            <DropdownMenuItem>Paste</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('cut')}>
+              Cut
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('copy')}>
+              Copy
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('paste')}>
+              Paste
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => editor.chain().focus().selectAll().run()}>
+              Select all
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onOpenFindReplace}>
               <Search className="h-4 w-4 mr-2" />
@@ -181,11 +382,27 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>Image</DropdownMenuItem>
-            <DropdownMenuItem>Link</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowImageDialog(true)}>
+              <Image className="h-4 w-4 mr-2" />
+              Image from URL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>
+              <Image className="h-4 w-4 mr-2" />
+              Upload image
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowLinkDialog(true)}>
+              <Link className="h-4 w-4 mr-2" />
+              Link
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Table</DropdownMenuItem>
-            <DropdownMenuItem>Horizontal line</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleInsertTable}>
+              <Table className="h-4 w-4 mr-2" />
+              Table
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleInsertHorizontalRule}>
+              <Minus className="h-4 w-4 mr-2" />
+              Horizontal line
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -200,16 +417,29 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               <DropdownMenuSubTrigger>Text</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleBold().run()}>
+                  <Bold className="h-4 w-4 mr-2" />
                   Bold
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleItalic().run()}>
+                  <Italic className="h-4 w-4 mr-2" />
                   Italic
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleUnderline().run()}>
+                  <UnderlineIcon className="h-4 w-4 mr-2" />
                   Underline
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleStrike().run()}>
+                  <Strikethrough className="h-4 w-4 mr-2" />
                   Strikethrough
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleSubscript().run()}>
+                  <Subscript className="h-4 w-4 mr-2" />
+                  Subscript
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+                  <Superscript className="h-4 w-4 mr-2" />
+                  Superscript
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -228,27 +458,48 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
                   Heading 3
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}>
+                  Heading 4
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Align</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+                  <AlignLeft className="h-4 w-4 mr-2" />
                   Left
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+                  <AlignCenter className="h-4 w-4 mr-2" />
                   Center
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('right').run()}>
+                  <AlignRight className="h-4 w-4 mr-2" />
                   Right
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('justify').run()}>
+                  <AlignJustify className="h-4 w-4 mr-2" />
                   Justify
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <LineChart className="h-4 w-4 mr-2" />
+                Line spacing
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {LINE_HEIGHTS.map((lh) => (
+                  <DropdownMenuItem key={lh.value} onClick={() => editor.chain().focus().setLineHeight(lh.value).run()}>
+                    {lh.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}>
+              <RemoveFormatting className="h-4 w-4 mr-2" />
               Clear formatting
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -261,8 +512,14 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>Word count</DropdownMenuItem>
-            <DropdownMenuItem>Spelling & grammar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowWordCount(true)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Word count
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => toast.info('Spell check is handled by your browser')}>
+              <SpellCheck className="h-4 w-4 mr-2" />
+              Spelling & grammar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -273,8 +530,14 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>Keyboard shortcuts</DropdownMenuItem>
-            <DropdownMenuItem>About</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowKeyboardShortcuts(true)}>
+              <Keyboard className="h-4 w-4 mr-2" />
+              Keyboard shortcuts
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowAbout(true)}>
+              <Info className="h-4 w-4 mr-2" />
+              About
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -399,31 +662,44 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         {/* Font size */}
         <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-6"
-            onClick={() => {
-              // Decrease font size logic would go here
-            }}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Input
-            type="text"
-            defaultValue="11"
-            className="w-10 h-8 text-center text-sm px-1"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-6"
-            onClick={() => {
-              // Increase font size logic would go here
-            }}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-6"
+                onClick={decreaseFontSize}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Decrease font size</TooltipContent>
+          </Tooltip>
+          <Select value={fontSize} onValueChange={handleFontSizeChange}>
+            <SelectTrigger className="w-14 h-8 text-center px-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FONT_SIZES.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-6"
+                onClick={increaseFontSize}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Increase font size</TooltipContent>
+          </Tooltip>
         </div>
 
         <Separator orientation="vertical" className="h-6 mx-1" />
@@ -465,10 +741,24 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               className={cn("h-8 w-8", editor.isActive('underline') && "bg-accent")}
               onClick={() => editor.chain().focus().toggleUnderline().run()}
             >
-              <Underline className="h-4 w-4" />
+              <UnderlineIcon className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Underline (Ctrl+U)</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8", editor.isActive('strike') && "bg-accent")}
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+            >
+              <Strikethrough className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Strikethrough</TooltipContent>
         </Tooltip>
 
         {/* Text Color */}
@@ -513,8 +803,47 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 />
               ))}
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2"
+              onClick={() => editor.chain().focus().unsetHighlight().run()}
+            >
+              Remove highlight
+            </Button>
           </PopoverContent>
         </Popover>
+
+        <Separator orientation="vertical" className="h-6 mx-1" />
+
+        {/* Subscript/Superscript */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8", editor.isActive('subscript') && "bg-accent")}
+              onClick={() => editor.chain().focus().toggleSubscript().run()}
+            >
+              <Subscript className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Subscript</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-8 w-8", editor.isActive('superscript') && "bg-accent")}
+              onClick={() => editor.chain().focus().toggleSuperscript().run()}
+            >
+              <Superscript className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Superscript</TooltipContent>
+        </Tooltip>
 
         <Separator orientation="vertical" className="h-6 mx-1" />
 
@@ -526,9 +855,10 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               size="icon"
               className={cn("h-8 w-8", editor.isActive('link') && "bg-accent")}
               onClick={() => {
-                const url = window.prompt('Enter URL');
-                if (url) {
-                  editor.chain().focus().setLink({ href: url }).run();
+                if (editor.isActive('link')) {
+                  editor.chain().focus().unsetLink().run();
+                } else {
+                  setShowLinkDialog(true);
                 }
               }}
             >
@@ -545,17 +875,27 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => {
-                const url = window.prompt('Enter image URL');
-                if (url) {
-                  editor.chain().focus().setImage({ src: url }).run();
-                }
-              }}
+              onClick={() => imageInputRef.current?.click()}
             >
               <Image className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Insert image</TooltipContent>
+        </Tooltip>
+
+        {/* Table */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleInsertTable}
+            >
+              <Table className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Insert table</TooltipContent>
         </Tooltip>
 
         <Separator orientation="vertical" className="h-6 mx-1" />
@@ -617,6 +957,28 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <TooltipContent>Justify</TooltipContent>
         </Tooltip>
 
+        {/* Line spacing */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <LineChart className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-32 p-1">
+            {LINE_HEIGHTS.map((lh) => (
+              <Button
+                key={lh.value}
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => editor.chain().focus().setLineHeight(lh.value).run()}
+              >
+                {lh.label}
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
         <Separator orientation="vertical" className="h-6 mx-1" />
 
         {/* Lists */}
@@ -651,7 +1013,12 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
         {/* Indent */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => editor.chain().focus().outdent().run()}
+            >
               <IndentDecrease className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
@@ -660,7 +1027,12 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => editor.chain().focus().indent().run()}
+            >
               <IndentIncrease className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
@@ -716,6 +1088,138 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <TooltipContent>AI Assistant</TooltipContent>
         </Tooltip>
       </div>
+
+      {/* Link Dialog */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Insert Link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>URL</Label>
+              <Input
+                placeholder="https://example.com"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
+            <Button onClick={handleSetLink}>Insert</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image URL Dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Insert Image from URL</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Image URL</Label>
+              <Input
+                placeholder="https://example.com/image.jpg"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImageDialog(false)}>Cancel</Button>
+            <Button onClick={handleSetImage}>Insert</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Word Count Dialog */}
+      <Dialog open={showWordCount} onOpenChange={setShowWordCount}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Word Count</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {(() => {
+              const counts = getWordCount();
+              return (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Words:</span>
+                    <span className="font-medium">{counts.words}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Characters (with spaces):</span>
+                    <span className="font-medium">{counts.characters}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Characters (without spaces):</span>
+                    <span className="font-medium">{counts.charactersNoSpaces}</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowWordCount(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Keyboard Shortcuts Dialog */}
+      <Dialog open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
+            {[
+              { key: 'Ctrl+B', action: 'Bold' },
+              { key: 'Ctrl+I', action: 'Italic' },
+              { key: 'Ctrl+U', action: 'Underline' },
+              { key: 'Ctrl+Z', action: 'Undo' },
+              { key: 'Ctrl+Y', action: 'Redo' },
+              { key: 'Ctrl+Shift+S', action: 'Strikethrough' },
+              { key: 'Ctrl+K', action: 'Insert link' },
+              { key: 'Ctrl+Shift+7', action: 'Numbered list' },
+              { key: 'Ctrl+Shift+8', action: 'Bulleted list' },
+              { key: 'Tab', action: 'Indent' },
+              { key: 'Shift+Tab', action: 'Outdent' },
+            ].map((shortcut) => (
+              <div key={shortcut.key} className="flex justify-between py-1 border-b border-border last:border-0">
+                <span>{shortcut.action}</span>
+                <kbd className="px-2 py-1 bg-muted rounded text-xs">{shortcut.key}</kbd>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowKeyboardShortcuts(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* About Dialog */}
+      <Dialog open={showAbout} onOpenChange={setShowAbout}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>About</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              A rich text editor built with TipTap and React. Features include formatting, 
+              tables, images, links, and AI-powered writing assistance.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Version 1.0.0
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowAbout(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

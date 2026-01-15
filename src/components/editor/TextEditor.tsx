@@ -12,12 +12,19 @@ import Placeholder from '@tiptap/extension-placeholder';
 import FontFamily from '@tiptap/extension-font-family';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import EditorHeader from './EditorHeader';
 import EditorToolbar from './EditorToolbar';
 import EditorRuler from './EditorRuler';
 import FindReplaceDialog from './FindReplaceDialog';
 import PageSetupDialog from './PageSetupDialog';
 import AISidebar from './AISidebar';
+import FontSize from './extensions/FontSize';
+import LineHeight from './extensions/LineHeight';
+import Indent from './extensions/Indent';
 import { PAGE_SIZES, PageSize } from './types';
 import { toast } from 'sonner';
 
@@ -50,8 +57,17 @@ const TextEditor: React.FC = () => {
         placeholder: 'Start typing...',
       }),
       FontFamily,
+      FontSize,
+      LineHeight,
+      Indent,
       Subscript,
       Superscript,
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
     ],
     content: '<p></p>',
     editorProps: {
