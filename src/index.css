@@ -6,59 +6,81 @@
 
 @layer base {
   :root {
-    /* Athena Brand Colors */
-    --primary: 210 100% 40%; /* Primary Blue #0066CC */
+    /* ============================= */
+    /* ATHENA BRAND CORE TOKENS      */
+    /* ============================= */
+
+    /* Primary – Athena Deep Blue */
+    --primary: 221 83% 53%;            /* #1e40af */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 45 100% 51%; /* Gold #FFB800 */
-    --secondary-foreground: 220 50% 20%;
-    
-    --background: 220 14% 96%; /* Light Gray #F4F5F7 */
-    --foreground: 220 50% 20%; /* Navy Text #1A2B4A */
-    
+
+    /* Secondary – Athena Gold */
+    --secondary: 43 96% 56%;           /* #fbbf24 */
+    --secondary-foreground: 221 39% 11%; /* #0f172a */
+
+    /* Accent – Intelligence / AI */
+    --accent: 204 94% 64%;             /* #60a5fa */
+    --accent-foreground: 221 39% 11%;
+
+    /* Backgrounds */
+    --background: 220 14% 96%;         /* #f8fafc */
+    --foreground: 221 39% 11%;         /* #0f172a */
+
+    /* Cards / Panels */
     --card: 0 0% 100%;
-    --card-foreground: 220 50% 20%;
-    
+    --card-foreground: 221 39% 11%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 220 50% 20%;
-    
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 20% 46%;
-    
-    --accent: 210 100% 95%;
-    --accent-foreground: 210 100% 40%;
-    
-    --destructive: 0 84% 60%;
+    --popover-foreground: 221 39% 11%;
+
+    /* Muted UI (toolbars, separators) */
+    --muted: 220 14% 92%;              /* #e5e7eb */
+    --muted-foreground: 215 16% 47%;   /* #64748b */
+
+    /* Borders & Inputs */
+    --border: 220 13% 86%;             /* #d1d5db */
+    --input: 220 13% 86%;
+    --ring: 221 83% 53%;
+
+    /* Status */
+    --destructive: 0 84% 60%;          /* #ef4444 */
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 220 14% 86%;
-    --input: 220 14% 86%;
-    --ring: 210 100% 40%;
-    
+
+    /* Radius – Academic but modern */
     --radius: 0.5rem;
-    
-    /* Gradient for AI buttons */
-    --gradient-ai: linear-gradient(135deg, hsl(210 100% 40%) 0%, hsl(220 100% 50%) 100%);
+
+    /* AI / CTA Gradient */
+    --gradient-ai: linear-gradient(
+      135deg,
+      hsl(221 83% 53%) 0%,
+      hsl(204 94% 64%) 100%
+    );
   }
 
+  /* ============================= */
+  /* DARK MODE – ATHENA PREMIUM    */
+  /* ============================= */
+
   .dark {
-    --background: 220 50% 10%;
-    --foreground: 220 14% 96%;
-    
-    --card: 220 50% 15%;
-    --card-foreground: 220 14% 96%;
-    
-    --popover: 220 50% 15%;
-    --popover-foreground: 220 14% 96%;
-    
-    --muted: 220 50% 20%;
-    --muted-foreground: 220 14% 70%;
-    
-    --accent: 210 100% 20%;
-    --accent-foreground: 210 100% 70%;
-    
-    --border: 220 50% 25%;
-    --input: 220 50% 25%;
+    --background: 221 39% 11%;         /* #0f172a */
+    --foreground: 0 0% 100%;
+
+    --card: 222 47% 11%;               /* #020617 */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 0 0% 100%;
+
+    --muted: 215 28% 17%;              /* #1e293b */
+    --muted-foreground: 215 20% 65%;   /* #94a3b8 */
+
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+
+    --accent: 204 94% 64%;
+    --accent-foreground: 221 39% 11%;
+
+    --ring: 204 94% 64%;
   }
 }
 
@@ -124,4 +146,56 @@
 .search-highlight-current {
   background-color: hsl(25 100% 60%);
   border-radius: 2px;
+}
+
+/* Toolbar button styles */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  width: 24px;
+  border-radius: 3px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 2px;
+  margin: 0;
+}
+
+.toolbar-btn:hover {
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.toolbar-btn.active {
+  background-color: hsl(var(--accent));
+  border-color: hsl(var(--border));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Style for dropdown toolbar buttons */
+.toolbar-btn.dropdown {
+  min-width: auto;
+  padding: 2px 6px;
+  height: 24px;
+}
+
+/* Editor-specific toolbar styling */
+.editor-toolbar {
+  background-color: hsl(var(--toolbar-bg, var(--muted)));
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 8px;
 }

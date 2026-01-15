@@ -1,4 +1,4 @@
-import TextEditor from "@/components/editor/TextEditor";
+import { TextEditor } from "@/components/editor/TextEditor";
 
 const Index = () => {
   return (

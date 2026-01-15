@@ -1,15 +1,53 @@
-import React from 'react';
 import { Editor } from '@tiptap/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { motion } from 'framer-motion';
+import {
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Code,
+  List,
+  ListOrdered,
+  Quote,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Link,
+  Image,
+  Table,
+  Highlighter,
+  Undo,
+  Redo,
+  Minus,
+  Printer,
+  Search,
+  PaintBucket,
+  Type,
+  ChevronDown,
+  Plus,
+  Minus as MinusIcon,
+  IndentIncrease,
+  IndentDecrease,
+  RemoveFormatting,
+  Subscript,
+  Superscript,
+  MessageSquare,
+  CheckSquare,
+  MoreHorizontal,
+  Baseline,
+} from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,116 +58,202 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  List,
-  ListOrdered,
-  Undo,
-  Redo,
-  Link,
-  Image,
-  Search,
-  Minus,
-  Plus,
-  Printer,
-  ChevronDown,
-  MoreHorizontal,
-  Highlighter,
-  Type,
-  IndentDecrease,
-  IndentIncrease,
-  RemoveFormatting,
-  LineChart,
-  FileText,
-  Settings,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useState, useCallback } from 'react';
 
 interface EditorToolbarProps {
   editor: Editor | null;
   zoom: number;
   onZoomChange: (zoom: number) => void;
-  onOpenFindReplace: () => void;
-  onOpenPageSetup: () => void;
 }
 
+interface ToolbarButtonProps {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  tooltip: string;
+  children: React.ReactNode;
+}
+
+const ToolbarButton = ({
+  onClick,
+  isActive,
+  disabled,
+  tooltip,
+  children,
+}: ToolbarButtonProps) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`toolbar-btn ${isActive ? 'active' : ''}`}
+      >
+        {children}
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="bottom" className="text-xs">
+      {tooltip}
+    </TooltipContent>
+  </Tooltip>
+);
+
 const FONTS = [
-  'Arial',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Verdana',
-  'Trebuchet MS',
-  'Comic Sans MS',
-  'Inter',
+  { label: 'Arial', value: 'Arial' },
+  { label: 'Georgia', value: 'Georgia' },
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Courier New', value: 'Courier New' },
+  { label: 'Verdana', value: 'Verdana' },
+  { label: 'Trebuchet MS', value: 'Trebuchet MS' },
+  { label: 'Comic Sans MS', value: 'Comic Sans MS' },
+  { label: 'Impact', value: 'Impact' },
 ];
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
 
-const COLORS = [
+const TEXT_COLORS = [
   '#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff',
   '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff',
   '#e6b8af', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#c9daf8', '#cfe2f3', '#d9d2e9', '#ead1dc',
+  '#dd7e6b', '#ea9999', '#f9cb9c', '#ffe599', '#b6d7a8', '#a2c4c9', '#a4c2f4', '#9fc5e8', '#b4a7d6', '#d5a6bd',
 ];
 
-const EditorToolbar: React.FC<EditorToolbarProps> = ({
-  editor,
-  zoom,
-  onZoomChange,
-  onOpenFindReplace,
-  onOpenPageSetup,
-}) => {
+const HIGHLIGHT_COLORS = [
+  '#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#ff0000', '#0000ff',
+  '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#cfe2f3', '#d9d2e9',
+];
+
+const STYLES = [
+  { label: 'Normal text', level: 0 },
+  { label: 'Title', level: 1 },
+  { label: 'Heading 1', level: 1 },
+  { label: 'Heading 2', level: 2 },
+  { label: 'Heading 3', level: 3 },
+  { label: 'Heading 4', level: 4 },
+  { label: 'Heading 5', level: 5 },
+  { label: 'Heading 6', level: 6 },
+];
+
+const LINE_SPACINGS = [
+  { label: 'Single', value: 1 },
+  { label: '1.15', value: 1.15 },
+  { label: '1.5', value: 1.5 },
+  { label: 'Double', value: 2 },
+];
+
+export const EditorToolbar = ({ editor, zoom, onZoomChange }: EditorToolbarProps) => {
+  const [linkUrl, setLinkUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [currentFontSize, setCurrentFontSize] = useState(11);
+  const [currentFont, setCurrentFont] = useState('Arial');
+  const [currentTextColor, setCurrentTextColor] = useState('#000000');
+  const [currentHighlight, setCurrentHighlight] = useState('#ffff00');
+  const [lineSpacing, setLineSpacing] = useState(1.15);
+
   if (!editor) return null;
 
-  const currentFont = editor.getAttributes('textStyle').fontFamily || 'Arial';
-  const currentColor = editor.getAttributes('textStyle').color || '#000000';
+  const addLink = () => {
+    if (linkUrl) {
+      editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run();
+      setLinkUrl('');
+    }
+  };
+
+  const addImage = () => {
+    if (imageUrl) {
+      editor.chain().focus().setImage({ src: imageUrl }).run();
+      setImageUrl('');
+    }
+  };
+
+  const addTable = () => {
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const setFontFamily = (font: string) => {
+    setCurrentFont(font);
+    editor.chain().focus().setFontFamily(font).run();
+  };
+
+  const setTextColor = (color: string) => {
+    setCurrentTextColor(color);
+    editor.chain().focus().setColor(color).run();
+  };
+
+  const setHighlightColor = (color: string) => {
+    setCurrentHighlight(color);
+    editor.chain().focus().setHighlight({ color }).run();
+  };
+
+  const getCurrentStyle = () => {
+    if (editor.isActive('heading', { level: 1 })) return 'Heading 1';
+    if (editor.isActive('heading', { level: 2 })) return 'Heading 2';
+    if (editor.isActive('heading', { level: 3 })) return 'Heading 3';
+    if (editor.isActive('heading', { level: 4 })) return 'Heading 4';
+    if (editor.isActive('heading', { level: 5 })) return 'Heading 5';
+    if (editor.isActive('heading', { level: 6 })) return 'Heading 6';
+    return 'Normal text';
+  };
+
+  const setStyle = (level: number) => {
+    if (level === 0) {
+      editor.chain().focus().setParagraph().run();
+    } else {
+      editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
+    }
+  };
+
+  const increaseFontSize = () => {
+    const currentIndex = FONT_SIZES.indexOf(currentFontSize);
+    if (currentIndex < FONT_SIZES.length - 1) {
+      setCurrentFontSize(FONT_SIZES[currentIndex + 1]);
+    }
+  };
+
+  const decreaseFontSize = () => {
+    const currentIndex = FONT_SIZES.indexOf(currentFontSize);
+    if (currentIndex > 0) {
+      setCurrentFontSize(FONT_SIZES[currentIndex - 1]);
+    }
+  };
+
+  const clearFormatting = () => {
+    editor.chain().focus().unsetAllMarks().clearNodes().run();
+  };
 
   return (
-    <div className="bg-card border-b border-border">
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="sticky top-[57px] z-20 bg-background border-b border-border"
+    >
       {/* Menu Bar */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b border-border text-sm">
+      <div className="flex items-center gap-1 px-1 py-0.5 border-b border-border text-xs bg-background">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              File
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            File
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem>New</DropdownMenuItem>
             <DropdownMenuItem>Open</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>Save</DropdownMenuItem>
-            <DropdownMenuItem>Download</DropdownMenuItem>
+            <DropdownMenuItem>Save as...</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onOpenPageSetup}>
-              <Settings className="h-4 w-4 mr-2" />
-              Page setup
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handlePrint}>Print</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              Edit
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            Edit
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => editor.chain().focus().undo().run()}>
@@ -139,58 +263,52 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               Redo
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Cut</DropdownMenuItem>
-            <DropdownMenuItem>Copy</DropdownMenuItem>
-            <DropdownMenuItem>Paste</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('cut')}>Cut</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('copy')}>Copy</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => document.execCommand('paste')}>Paste</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onOpenFindReplace}>
-              <Search className="h-4 w-4 mr-2" />
-              Find and replace
+            <DropdownMenuItem onClick={() => editor.chain().focus().selectAll().run()}>
+              Select all
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              View
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            View
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Zoom</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => onZoomChange(50)}>50%</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onZoomChange(75)}>75%</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onZoomChange(100)}>100%</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onZoomChange(125)}>125%</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onZoomChange(150)}>150%</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onZoomChange(200)}>200%</DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem onClick={() => onZoomChange(50)} className="text-xs">50%</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onZoomChange(75)} className="text-xs">75%</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onZoomChange(100)} className="text-xs">100%</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onZoomChange(125)} className="text-xs">125%</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onZoomChange(150)} className="text-xs">150%</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              Insert
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            Insert
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem>Image</DropdownMenuItem>
-            <DropdownMenuItem>Link</DropdownMenuItem>
+            <DropdownMenuItem onClick={addTable}>Table</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Table</DropdownMenuItem>
-            <DropdownMenuItem>Horizontal line</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+              Horizontal line
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+              Quote
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+              Code block
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              Format
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            Format
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuSub>
@@ -208,27 +326,27 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 <DropdownMenuItem onClick={() => editor.chain().focus().toggleStrike().run()}>
                   Strikethrough
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleSuperscript().run()}>
+                  Superscript
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleSubscript().run()}>
+                  Subscript
+                </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Paragraph styles</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => editor.chain().focus().setParagraph().run()}>
-                  Normal text
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
-                  Heading 1
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-                  Heading 2
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
-                  Heading 3
-                </DropdownMenuItem>
+                {STYLES.map((style) => (
+                  <DropdownMenuItem key={style.label} onClick={() => setStyle(style.level)}>
+                    {style.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Align</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>Align & indent</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('left').run()}>
                   Left
@@ -245,247 +363,193 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}>
-              Clear formatting
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={clearFormatting}>Clear formatting</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              Tools
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            Tools
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => setShowSearch(!showSearch)}>
+              Find and replace
+            </DropdownMenuItem>
             <DropdownMenuItem>Word count</DropdownMenuItem>
-            <DropdownMenuItem>Spelling & grammar</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              Help
-            </Button>
+          <DropdownMenuTrigger className="px-1.5 py-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors text-xs">
+            Help
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem>Keyboard shortcuts</DropdownMenuItem>
-            <DropdownMenuItem>About</DropdownMenuItem>
+            <DropdownMenuItem>Help</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* Main Toolbar */}
-      <div className="flex items-center gap-1 px-2 py-1 flex-wrap">
+      <div className="flex items-center gap-1 px-1 py-1 flex-wrap bg-background">
         {/* Search */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenFindReplace}>
-              <Search className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Find and replace (Ctrl+H)</TooltipContent>
-        </Tooltip>
+        <ToolbarButton onClick={() => setShowSearch(!showSearch)} tooltip="Search (Ctrl+F)">
+          <Search className="w-4 h-4" />
+        </ToolbarButton>
 
-        {/* Undo/Redo */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-            >
-              <Undo className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-            >
-              <Redo className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Redo (Ctrl+Y)</TooltipContent>
-        </Tooltip>
+        {/* History */}
+        <ToolbarButton
+          onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().undo()}
+          tooltip="Undo (Ctrl+Z)"
+        >
+          <Undo className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().redo()}
+          tooltip="Redo (Ctrl+Y)"
+        >
+          <Redo className="w-4 h-4" />
+        </ToolbarButton>
 
         {/* Print */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Print (Ctrl+P)</TooltipContent>
-        </Tooltip>
+        <ToolbarButton onClick={handlePrint} tooltip="Print (Ctrl+P)">
+          <Printer className="w-4 h-4" />
+        </ToolbarButton>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
 
         {/* Zoom */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onZoomChange(zoom - 10)}
-            disabled={zoom <= 50}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <span className="w-12 text-center text-sm">{zoom}%</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onZoomChange(zoom + 10)}
-            disabled={zoom >= 200}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Styles dropdown */}
-        <Select
-          value={editor.isActive('heading', { level: 1 }) ? 'h1' : editor.isActive('heading', { level: 2 }) ? 'h2' : editor.isActive('heading', { level: 3 }) ? 'h3' : 'p'}
-          onValueChange={(value) => {
-            if (value === 'p') editor.chain().focus().setParagraph().run();
-            else if (value === 'h1') editor.chain().focus().toggleHeading({ level: 1 }).run();
-            else if (value === 'h2') editor.chain().focus().toggleHeading({ level: 2 }).run();
-            else if (value === 'h3') editor.chain().focus().toggleHeading({ level: 3 }).run();
-          }}
-        >
-          <SelectTrigger className="w-32 h-8">
-            <SelectValue placeholder="Style" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="p">Normal text</SelectItem>
-            <SelectItem value="h1">Heading 1</SelectItem>
-            <SelectItem value="h2">Heading 2</SelectItem>
-            <SelectItem value="h3">Heading 3</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Font family */}
-        <Select
-          value={currentFont}
-          onValueChange={(value) => editor.chain().focus().setFontFamily(value).run()}
-        >
-          <SelectTrigger className="w-32 h-8">
-            <SelectValue placeholder="Font" />
-          </SelectTrigger>
-          <SelectContent>
-            {FONTS.map((font) => (
-              <SelectItem key={font} value={font} style={{ fontFamily: font }}>
-                {font}
-              </SelectItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn flex items-center gap-1 px-2 min-w-[60px] justify-center">
+              <span className="text-sm">{zoom}%</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {[50, 75, 90, 100, 125, 150, 200].map((z) => (
+              <DropdownMenuItem key={z} onClick={() => onZoomChange(z)} className="text-xs p-1">
+                {z}%
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {/* Font size */}
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-6"
-            onClick={() => {
-              // Decrease font size logic would go here
-            }}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Input
-            type="text"
-            defaultValue="11"
-            className="w-10 h-8 text-center text-sm px-1"
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-6"
-            onClick={() => {
-              // Increase font size logic would go here
-            }}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+        {/* Styles Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn flex items-center gap-1 px-2 min-w-[100px] justify-between">
+              <span className="text-sm truncate">{getCurrentStyle()}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-48">
+            {STYLES.map((style) => (
+              <DropdownMenuItem 
+                key={style.label} 
+                onClick={() => setStyle(style.level)}
+                className={`${style.level === 1 ? 'text-lg font-bold' : style.level === 2 ? 'text-base font-semibold' : style.level === 3 ? 'text-sm font-medium' : 'text-sm'} text-xs p-1`}
+              >
+                {style.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+        {/* Font Family */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn flex items-center gap-1 px-2 min-w-[100px] justify-between">
+              <span className="text-sm truncate">{currentFont}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="max-h-64 overflow-y-auto">
+            {FONTS.map((font) => (
+              <DropdownMenuItem 
+                key={font.value} 
+                onClick={() => setFontFamily(font.value)}
+                style={{ fontFamily: font.value }}
+              >
+                {font.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+        {/* Font Size */}
+        <div className="flex items-center gap-1">
+          <ToolbarButton onClick={decreaseFontSize} tooltip="Decrease font size">
+            <MinusIcon className="w-3 h-3" />
+          </ToolbarButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="toolbar-btn px-2 min-w-[40px] text-center text-sm">
+                {currentFontSize}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-64 overflow-y-auto">
+              {FONT_SIZES.map((size) => (
+                <DropdownMenuItem key={size} onClick={() => setCurrentFontSize(size)} className="text-xs">
+                  {size}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ToolbarButton onClick={increaseFontSize} tooltip="Increase font size">
+            <Plus className="w-3 h-3" />
+          </ToolbarButton>
         </div>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
 
-        {/* Bold, Italic, Underline, Strikethrough */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('bold') && "bg-accent")}
-              onClick={() => editor.chain().focus().toggleBold().run()}
-            >
-              <Bold className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Bold (Ctrl+B)</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('italic') && "bg-accent")}
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-            >
-              <Italic className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Italic (Ctrl+I)</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('underline') && "bg-accent")}
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-            >
-              <Underline className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Underline (Ctrl+U)</TooltipContent>
-        </Tooltip>
+        {/* Text formatting */}
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          isActive={editor.isActive('bold')}
+          tooltip="Bold (Ctrl+B)"
+        >
+          <Bold className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          isActive={editor.isActive('italic')}
+          tooltip="Italic (Ctrl+I)"
+        >
+          <Italic className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          isActive={editor.isActive('underline')}
+          tooltip="Underline (Ctrl+U)"
+        >
+          <Underline className="w-4 h-4" />
+        </ToolbarButton>
 
         {/* Text Color */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <div className="flex flex-col items-center">
-                <Type className="h-3.5 w-3.5" />
-                <div className="w-4 h-1 mt-0.5" style={{ backgroundColor: currentColor }} />
-              </div>
-            </Button>
+            <button className="toolbar-btn flex flex-col items-center p-1.5">
+              <Type className="w-4 h-4" />
+              <div className="w-4 h-1 mt-0.5 rounded-sm" style={{ backgroundColor: currentTextColor }} />
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-2">
             <div className="grid grid-cols-10 gap-1">
-              {COLORS.map((color) => (
+              {TEXT_COLORS.map((color) => (
                 <button
                   key={color}
                   className="w-5 h-5 rounded border border-border hover:scale-110 transition-transform"
                   style={{ backgroundColor: color }}
-                  onClick={() => editor.chain().focus().setColor(color).run()}
+                  onClick={() => setTextColor(color)}
                 />
               ))}
             </div>
@@ -495,209 +559,247 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
         {/* Highlight Color */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Highlighter className="h-4 w-4" />
-            </Button>
+            <button className={`toolbar-btn flex flex-col items-center p-1.5 ${editor.isActive('highlight') ? 'active' : ''}`}>
+              <Highlighter className="w-4 h-4" />
+              <div className="w-4 h-1 mt-0.5 rounded-sm" style={{ backgroundColor: currentHighlight }} />
+            </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-2">
-            <div className="grid grid-cols-10 gap-1">
-              {COLORS.slice(10).map((color) => (
+            <div className="grid grid-cols-6 gap-1">
+              {HIGHLIGHT_COLORS.map((color) => (
                 <button
                   key={color}
-                  className="w-5 h-5 rounded border border-border hover:scale-110 transition-transform"
+                  className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
                   style={{ backgroundColor: color }}
-                  onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+                  onClick={() => setHighlightColor(color)}
                 />
               ))}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full mt-2 text-xs"
+              onClick={() => editor.chain().focus().unsetHighlight().run()}
+            >
+              Remove highlight
+            </Button>
+          </PopoverContent>
+        </Popover>
+
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+        {/* Link */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className={`toolbar-btn ${editor.isActive('link') ? 'active' : ''}`}>
+              <Link className="w-4 h-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter URL..."
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addLink()}
+              />
+              <Button size="sm" onClick={addLink}>Add</Button>
             </div>
           </PopoverContent>
         </Popover>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Link */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('link') && "bg-accent")}
-              onClick={() => {
-                const url = window.prompt('Enter URL');
-                if (url) {
-                  editor.chain().focus().setLink({ href: url }).run();
-                }
-              }}
-            >
-              <Link className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Insert link (Ctrl+K)</TooltipContent>
-        </Tooltip>
+        {/* Comment */}
+        <ToolbarButton onClick={() => {}} tooltip="Add comment (Ctrl+Alt+M)">
+          <MessageSquare className="w-4 h-4" />
+        </ToolbarButton>
 
         {/* Image */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => {
-                const url = window.prompt('Enter image URL');
-                if (url) {
-                  editor.chain().focus().setImage({ src: url }).run();
-                }
-              }}
-            >
-              <Image className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Insert image</TooltipContent>
-        </Tooltip>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="toolbar-btn">
+              <Image className="w-4 h-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter image URL..."
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addImage()}
+              />
+              <Button size="sm" onClick={addImage}>Add</Button>
+            </div>
+          </PopoverContent>
+        </Popover>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
 
-        {/* Alignment */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive({ textAlign: 'left' }) && "bg-accent")}
-              onClick={() => editor.chain().focus().setTextAlign('left').run()}
-            >
-              <AlignLeft className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align left</TooltipContent>
-        </Tooltip>
+        {/* Alignment Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn flex items-center gap-1">
+              <AlignLeft className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('left').run()} className="text-xs p-1">
+              <AlignLeft className="w-3 h-3 mr-1" /> L
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('center').run()} className="text-xs p-1">
+              <AlignCenter className="w-3 h-3 mr-1" /> C
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('right').run()} className="text-xs p-1">
+              <AlignRight className="w-3 h-3 mr-1" /> R
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('justify').run()} className="text-xs p-1">
+              <AlignJustify className="w-3 h-3 mr-1" /> J
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive({ textAlign: 'center' }) && "bg-accent")}
-              onClick={() => editor.chain().focus().setTextAlign('center').run()}
-            >
-              <AlignCenter className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align center</TooltipContent>
-        </Tooltip>
+        {/* Line Spacing */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn flex items-center gap-1">
+              <Baseline className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {LINE_SPACINGS.map((spacing) => (
+              <DropdownMenuItem 
+                key={spacing.value} 
+                onClick={() => setLineSpacing(spacing.value)}
+                className="text-xs p-1"
+              >
+                {spacing.label}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-xs p-1">SPC B</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs p-1">SPC A</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive({ textAlign: 'right' }) && "bg-accent")}
-              onClick={() => editor.chain().focus().setTextAlign('right').run()}
-            >
-              <AlignRight className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Align right</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive({ textAlign: 'justify' }) && "bg-accent")}
-              onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-            >
-              <AlignJustify className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Justify</TooltipContent>
-        </Tooltip>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
 
         {/* Lists */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('bulletList') && "bg-accent")}
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Bulleted list</TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={`toolbar-btn flex items-center gap-1 ${editor.isActive('bulletList') ? 'active' : ''}`}>
+              <List className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBulletList().run()} className="text-xs p-1">
+              • BL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBulletList().run()} className="text-xs p-1">
+              ◦ HB
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBulletList().run()} className="text-xs p-1">
+              ■ SB
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8", editor.isActive('orderedList') && "bg-accent")}
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            >
-              <ListOrdered className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Numbered list</TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={`toolbar-btn flex items-center gap-1 ${editor.isActive('orderedList') ? 'active' : ''}`}>
+              <ListOrdered className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleOrderedList().run()} className="text-xs p-1">
+              1. NL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleOrderedList().run()} className="text-xs p-1">
+              a. LL
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleOrderedList().run()} className="text-xs p-1">
+              i. RN
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {/* Indent */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <IndentDecrease className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Decrease indent</TooltipContent>
-        </Tooltip>
+        {/* Indentation */}
+        <ToolbarButton onClick={() => {}} tooltip="Decrease indent">
+          <IndentDecrease className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => {}} tooltip="Increase indent">
+          <IndentIncrease className="w-4 h-4" />
+        </ToolbarButton>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <IndentIncrease className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Increase indent</TooltipContent>
-        </Tooltip>
+        {/* Clear Formatting */}
+        <ToolbarButton onClick={clearFormatting} tooltip="Clear formatting (Ctrl+\)">
+          <RemoveFormatting className="w-4 h-4" />
+        </ToolbarButton>
 
-        <Separator orientation="vertical" className="h-6 mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-0.5" />
 
-        {/* Clear formatting */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
-            >
-              <RemoveFormatting className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Clear formatting</TooltipContent>
-        </Tooltip>
-
-        {/* Page Setup */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onOpenPageSetup}
-            >
-              <FileText className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Page setup</TooltipContent>
-        </Tooltip>
+        {/* More Options */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="toolbar-btn">
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleSuperscript().run()} className="text-xs p-1">
+              <Superscript className="w-3 h-3 mr-1" /> Superscript
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleSubscript().run()} className="text-xs p-1">
+              <Subscript className="w-3 h-3 mr-1" /> Subscript
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleStrike().run()} className="text-xs p-1">
+              <Strikethrough className="w-3 h-3 mr-1" /> Strikethrough
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleCode().run()} className="text-xs p-1">
+              <Code className="w-3 h-3 mr-1" /> Inline code
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBlockquote().run()} className="text-xs p-1">
+              <Quote className="w-3 h-3 mr-1" /> Quote
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={addTable} className="text-xs p-1">
+              <Table className="w-3 h-3 mr-1" /> Insert table
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().setHorizontalRule().run()} className="text-xs p-1">
+              <Minus className="w-3 h-3 mr-1" /> Horizontal line
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().toggleCodeBlock().run()} className="text-xs p-1">
+              <Code className="w-3 h-3 mr-1" /> Code block
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </div>
+
+      {/* Search Bar (toggleable) */}
+      {showSearch && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="px-2 py-1 border-t border-border bg-background"
+        >
+          <div className="flex items-center gap-1 max-w-md">
+            <Input
+              placeholder="Find in document..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-6 text-xs"
+            />
+            <Button size="sm" variant="outline" className="h-7 text-xs">F</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs">R</Button>
+            <Button size="sm" variant="ghost" className="h-7" onClick={() => setShowSearch(false)}>×</Button>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
   );
 };
-
-export default EditorToolbar;
