@@ -54,6 +54,7 @@ import {
   LineChart,
   FileText,
   Settings,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -64,6 +65,7 @@ interface EditorToolbarProps {
   onZoomChange: (zoom: number) => void;
   onOpenFindReplace: () => void;
   onOpenPageSetup: () => void;
+  onOpenAISidebar: () => void;
 }
 
 const FONTS = [
@@ -91,6 +93,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onZoomChange,
   onOpenFindReplace,
   onOpenPageSetup,
+  onOpenAISidebar,
 }) => {
   if (!editor) return null;
 
@@ -694,6 +697,23 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Page setup</TooltipContent>
+        </Tooltip>
+
+        <Separator orientation="vertical" className="h-6 mx-1" />
+
+        {/* AI Sidebar Toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 bg-gradient-to-r from-violet-500/10 to-purple-600/10 hover:from-violet-500/20 hover:to-purple-600/20"
+              onClick={onOpenAISidebar}
+            >
+              <Sparkles className="h-4 w-4 text-violet-600" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>AI Assistant</TooltipContent>
         </Tooltip>
       </div>
     </div>

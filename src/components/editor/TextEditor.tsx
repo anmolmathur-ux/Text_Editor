@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -16,12 +16,15 @@ import EditorToolbar from './EditorToolbar';
 import EditorRuler from './EditorRuler';
 import FindReplaceDialog from './FindReplaceDialog';
 import PageSetupDialog from './PageSetupDialog';
+import AISidebar from './AISidebar';
 import { PAGE_SIZES, PageSize } from './types';
 
 const TextEditor: React.FC = () => {
   const [zoom, setZoom] = useState(100);
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showPageSetup, setShowPageSetup] = useState(false);
+  const [showAISidebar, setShowAISidebar] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
   const [pageSize, setPageSize] = useState<PageSize>(PAGE_SIZES.letter);
   const [margins, setMargins] = useState({ top: 1, bottom: 1, left: 1, right: 1 });
   const [tabStops, setTabStops] = useState<number[]>([0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]);
@@ -55,6 +58,22 @@ const TextEditor: React.FC = () => {
     },
   });
 
+  // Track selected text for AI sidebar
+  useEffect(() => {
+    if (!editor) return;
+    
+    const updateSelection = () => {
+      const { from, to } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, ' ');
+      setSelectedText(text);
+    };
+
+    editor.on('selectionUpdate', updateSelection);
+    return () => {
+      editor.off('selectionUpdate', updateSelection);
+    };
+  }, [editor]);
+
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(Math.min(200, Math.max(50, newZoom)));
   }, []);
@@ -66,6 +85,22 @@ const TextEditor: React.FC = () => {
   const handleOpenPageSetup = useCallback(() => {
     setShowPageSetup(true);
   }, []);
+
+  const handleOpenAISidebar = useCallback(() => {
+    setShowAISidebar(true);
+  }, []);
+
+  const handleAIGenerate = useCallback((content: string) => {
+    if (editor) {
+      editor.chain().focus().insertContent(content).run();
+    }
+  }, [editor]);
+
+  const handleAITransform = useCallback((action: string, result: string) => {
+    if (editor) {
+      editor.chain().focus().deleteSelection().insertContent(result).run();
+    }
+  }, [editor]);
 
   const handlePageSizeChange = useCallback((size: PageSize) => {
     setPageSize(size);
@@ -101,6 +136,7 @@ const TextEditor: React.FC = () => {
         onZoomChange={handleZoomChange}
         onOpenFindReplace={handleOpenFindReplace}
         onOpenPageSetup={handleOpenPageSetup}
+        onOpenAISidebar={handleOpenAISidebar}
       />
 
       {/* Ruler */}
@@ -116,7 +152,7 @@ const TextEditor: React.FC = () => {
       />
 
       {/* Editor Area */}
-      <div className="flex-1 overflow-auto bg-muted/30 p-8">
+      <div className={`flex-1 overflow-auto bg-muted/30 p-8 transition-all ${showAISidebar ? 'mr-80' : ''}`}>
         <div
           className="mx-auto bg-card shadow-lg"
           style={{
@@ -153,6 +189,15 @@ const TextEditor: React.FC = () => {
         margins={margins}
         onPageSizeChange={handlePageSizeChange}
         onMarginsChange={handleMarginsChange}
+      />
+
+      {/* AI Sidebar */}
+      <AISidebar
+        isOpen={showAISidebar}
+        onClose={() => setShowAISidebar(false)}
+        onGenerate={handleAIGenerate}
+        selectedText={selectedText}
+        onTransformText={handleAITransform}
       />
     </div>
   );
